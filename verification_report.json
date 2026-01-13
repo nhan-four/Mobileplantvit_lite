@@ -1,0 +1,49 @@
+{
+  "config": {
+    "embed_dim": 256,
+    "encoder_depth": 1,
+    "ffn_expand": 2.0,
+    "attn_type": "linear",
+    "ffn_type": "mlp",
+    "output": "verification_report.json"
+  },
+  "verification": {
+    "attention": {
+      "expected": "linear",
+      "status": "PASS",
+      "message": "PASS: Sử dụng LinearSelfAttention (không có low-rank matrices)"
+    },
+    "ffn": {
+      "expected": "mlp",
+      "status": "PASS",
+      "message": "PASS: Sử dụng MLPFFN với 2 Linear layers (không có Conv)"
+    }
+  },
+  "parameter_check": {
+    "expected": {
+      "attn_params_per_layer": 196864,
+      "norm_params_per_layer": 1024,
+      "ffn_params_per_layer": 262144,
+      "block_params": 460032,
+      "total_encoder_params": 460032,
+      "breakdown": {
+        "qkv": 131328,
+        "out": 65536,
+        "norms": 1024,
+        "fc1": 131072,
+        "fc2": 131072
+      }
+    },
+    "actual": 461569,
+    "difference": 1537,
+    "difference_percent": 0.33410719254312743,
+    "litepp_reference": 386113,
+    "increase_vs_litepp": 75456,
+    "increase_percent": 19.542465547650558,
+    "status": "PASS",
+    "message": "PASS: Tăng 75,456 params nằm trong khoảng dự kiến (70,000 - 100,000)",
+    "total_params": 586030,
+    "total_params_check": true
+  },
+  "overall_status": "PASS"
+}

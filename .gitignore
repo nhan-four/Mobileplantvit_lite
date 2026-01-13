@@ -1,0 +1,23 @@
+cat > .gitignore << 'EOF'
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Mac & hệ thống
+.DS_Store
+
+# Log & output
+*.log
+nohup.out
+
+# Dữ liệu
+data/
+datasets/
+runs/
+runs_*/
+
+# Môi trường ảo (nếu có)
+venv/
+.env/
+EOF
