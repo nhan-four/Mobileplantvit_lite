@@ -18,6 +18,7 @@ from mobileplantvit.utils.metrics import (
     save_confusion_matrix_csv,
     save_confusion_matrix_png,
     save_per_class_metrics_csv,
+    save_classification_report,
 )
 
 Tensor = torch.Tensor
@@ -190,20 +191,31 @@ def run_phase(
     if logits.numel() > 0:
         y_true = labels.numpy().astype(np.int64)
         y_pred = logits.argmax(dim=1).numpy().astype(np.int64)
+        
+        # Convert logits to probabilities for AUC calculation
+        import torch.nn.functional as F
+        y_probs = F.softmax(logits, dim=1).numpy()
 
-        cm, per_cls, agg = compute_all_metrics(y_true, y_pred, class_names=class_names)
+        cm, per_cls, agg = compute_all_metrics(y_true, y_pred, class_names=class_names, y_probs=y_probs)
 
         save_json(
             os.path.join(phase_dir, "test_metrics.json"),
             {
                 "test_loss": float(test_loss),
+                "test_acc": float(test_acc),
                 "top1_accuracy": float(agg.accuracy),
+                "balanced_accuracy": float(agg.balanced_accuracy),
                 "macro_precision": float(agg.macro_precision),
                 "macro_recall": float(agg.macro_recall),
                 "macro_f1": float(agg.macro_f1),
                 "weighted_precision": float(agg.weighted_precision),
                 "weighted_recall": float(agg.weighted_recall),
                 "weighted_f1": float(agg.weighted_f1),
+                "macro_auc": float(agg.macro_auc),
+                "weighted_auc": float(agg.weighted_auc),
+                "top3_accuracy": float(agg.top3_accuracy),
+                "top5_accuracy": float(agg.top5_accuracy),
+                "cohens_kappa": float(agg.cohens_kappa),
                 "best_val_acc": float(best_val_acc),
                 "best_epoch": int(best_epoch),
             },
@@ -218,6 +230,14 @@ def run_phase(
             title=f"{phase_name} Confusion Matrix (normalized)",
         )
         save_per_class_metrics_csv(os.path.join(phase_dir, "per_class_metrics.csv"), per_cls, class_names=class_names)
+        
+        # Save comprehensive classification report for paper
+        save_classification_report(
+            os.path.join(phase_dir, "classification_report.csv"),
+            per_cls,
+            agg,
+            class_names,
+        )
 
         # Save raw predictions (useful for error analysis & qualitative figures)
         pred_rows = []

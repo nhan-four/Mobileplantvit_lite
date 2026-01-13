@@ -6,3 +6,4 @@ numpy
 Pillow
 matplotlib
 thop
+scikit-learn

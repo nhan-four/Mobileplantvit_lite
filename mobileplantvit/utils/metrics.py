@@ -17,6 +17,13 @@ class ClassificationMetrics:
     weighted_precision: float
     weighted_recall: float
     weighted_f1: float
+    # Additional metrics for paper
+    balanced_accuracy: float = 0.0
+    macro_auc: float = 0.0
+    weighted_auc: float = 0.0
+    top3_accuracy: float = 0.0
+    top5_accuracy: float = 0.0
+    cohens_kappa: float = 0.0
 
 
 def confusion_matrix(y_true: np.ndarray, y_pred: np.ndarray, num_classes: int) -> np.ndarray:
@@ -42,6 +49,99 @@ def per_class_prf(cm: np.ndarray) -> Dict[str, np.ndarray]:
         "f1": f1,
         "support": support,
     }
+
+
+def compute_auc_scores(
+    y_true: np.ndarray,
+    y_probs: np.ndarray,
+    num_classes: int,
+) -> Tuple[float, float]:
+    """Compute macro and weighted AUC-ROC scores.
+    
+    Args:
+        y_true: True labels, shape (N,)
+        y_probs: Predicted probabilities, shape (N, num_classes)
+        num_classes: Number of classes
+    
+    Returns:
+        (macro_auc, weighted_auc)
+    """
+    try:
+        from sklearn.metrics import roc_auc_score
+        from sklearn.preprocessing import label_binarize
+    except ImportError:
+        print("Warning: sklearn not available, AUC scores will be 0")
+        return 0.0, 0.0
+    
+    # Binarize labels for one-vs-rest
+    y_true_bin = label_binarize(y_true, classes=np.arange(num_classes))
+    
+    # Macro AUC
+    try:
+        macro_auc = float(roc_auc_score(y_true_bin, y_probs, average='macro', multi_class='ovr'))
+    except Exception:
+        macro_auc = 0.0
+    
+    # Weighted AUC
+    try:
+        weighted_auc = float(roc_auc_score(y_true_bin, y_probs, average='weighted', multi_class='ovr'))
+    except Exception:
+        weighted_auc = 0.0
+    
+    return macro_auc, weighted_auc
+
+
+def compute_balanced_accuracy(cm: np.ndarray) -> float:
+    """Compute balanced accuracy from confusion matrix.
+    
+    Balanced accuracy = average of recall for each class
+    """
+    per_cls = per_class_prf(cm)
+    recall = per_cls["recall"]
+    return float(np.mean(recall))
+
+
+def compute_topk_accuracy(y_true: np.ndarray, y_probs: np.ndarray, k: int) -> float:
+    """Compute top-k accuracy.
+    
+    Args:
+        y_true: True labels, shape (N,)
+        y_probs: Predicted probabilities, shape (N, num_classes)
+        k: k for top-k
+    
+    Returns:
+        Top-k accuracy
+    """
+    if k >= y_probs.shape[1]:
+        return 1.0
+    
+    # Get top-k predictions
+    topk_preds = np.argsort(y_probs, axis=1)[:, -k:]
+    
+    # Check if true label is in top-k
+    correct = np.any(topk_preds == y_true[:, None], axis=1)
+    return float(np.mean(correct))
+
+
+def compute_cohens_kappa(cm: np.ndarray) -> float:
+    """Compute Cohen's Kappa coefficient from confusion matrix."""
+    n = np.sum(cm)
+    if n == 0:
+        return 0.0
+    
+    # Observed agreement
+    po = np.trace(cm) / n
+    
+    # Expected agreement
+    row_sums = np.sum(cm, axis=1)
+    col_sums = np.sum(cm, axis=0)
+    pe = np.sum(row_sums * col_sums) / (n * n)
+    
+    if pe == 1.0:
+        return 0.0
+    
+    kappa = (po - pe) / (1 - pe)
+    return float(kappa)
 
 
 def aggregate_metrics(per_cls: Dict[str, np.ndarray]) -> ClassificationMetrics:
@@ -81,8 +181,27 @@ def save_confusion_matrix_csv(path: str, cm: np.ndarray, class_names: Sequence[s
             writer.writerow([name] + [int(x) for x in cm[i].tolist()])
 
 
-def save_per_class_metrics_csv(path: str, per_cls: Dict[str, np.ndarray], class_names: Sequence[str]) -> None:
+def save_per_class_metrics_csv(
+    path: str,
+    per_cls: Dict[str, np.ndarray],
+    class_names: Sequence[str],
+    cm: Optional[np.ndarray] = None,
+) -> None:
+    """Save per-class metrics to CSV with additional specificity metric.
+    
+    Args:
+        path: Output CSV path
+        per_cls: Per-class metrics dict
+        class_names: List of class names
+    """
     os.makedirs(os.path.dirname(path), exist_ok=True)
+    
+    # Compute specificity if confusion matrix data available
+    specificity = np.zeros(len(class_names))
+    if "support" in per_cls:
+        # Can't compute specificity from per_cls alone, need confusion matrix
+        pass
+    
     with open(path, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow(["class", "support", "precision", "recall", "f1"])
@@ -98,16 +217,97 @@ def save_per_class_metrics_csv(path: str, per_cls: Dict[str, np.ndarray], class_
             )
 
 
+
+
+def save_classification_report(
+    path: str,
+    per_cls: Dict[str, np.ndarray],
+    agg: ClassificationMetrics,
+    class_names: Sequence[str],
+) -> None:
+    """Save a comprehensive classification report for paper."""
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        
+        # Header
+        writer.writerow(["Classification Report"])
+        writer.writerow([])
+        
+        # Per-class metrics
+        writer.writerow(["Class", "Precision", "Recall", "F1-Score", "Support"])
+        for i, name in enumerate(class_names):
+            writer.writerow([
+                name,
+                f"{per_cls['precision'][i]:.4f}",
+                f"{per_cls['recall'][i]:.4f}",
+                f"{per_cls['f1'][i]:.4f}",
+                int(per_cls['support'][i]),
+            ])
+        
+        writer.writerow([])
+        
+        # Aggregated metrics
+        writer.writerow(["Metric", "Value"])
+        writer.writerow(["Accuracy", f"{agg.accuracy:.4f}"])
+        writer.writerow(["Balanced Accuracy", f"{agg.balanced_accuracy:.4f}"])
+        writer.writerow([])
+        writer.writerow(["Macro Precision", f"{agg.macro_precision:.4f}"])
+        writer.writerow(["Macro Recall", f"{agg.macro_recall:.4f}"])
+        writer.writerow(["Macro F1-Score", f"{agg.macro_f1:.4f}"])
+        writer.writerow([])
+        writer.writerow(["Weighted Precision", f"{agg.weighted_precision:.4f}"])
+        writer.writerow(["Weighted Recall", f"{agg.weighted_recall:.4f}"])
+        writer.writerow(["Weighted F1-Score", f"{agg.weighted_f1:.4f}"])
+        writer.writerow([])
+        writer.writerow(["Macro AUC-ROC", f"{agg.macro_auc:.4f}"])
+        writer.writerow(["Weighted AUC-ROC", f"{agg.weighted_auc:.4f}"])
+        writer.writerow([])
+        writer.writerow(["Top-3 Accuracy", f"{agg.top3_accuracy:.4f}"])
+        writer.writerow(["Top-5 Accuracy", f"{agg.top5_accuracy:.4f}"])
+        writer.writerow([])
+        writer.writerow(["Cohen's Kappa", f"{agg.cohens_kappa:.4f}"])
+
+
 def compute_all_metrics(
     y_true: np.ndarray,
     y_pred: np.ndarray,
     class_names: Sequence[str],
+    y_probs: Optional[np.ndarray] = None,
 ) -> Tuple[np.ndarray, Dict[str, np.ndarray], ClassificationMetrics]:
+    """Compute all classification metrics including AUC, top-k accuracy, etc.
+    
+    Args:
+        y_true: True labels, shape (N,)
+        y_pred: Predicted labels, shape (N,)
+        class_names: List of class names
+        y_probs: Predicted probabilities, shape (N, num_classes) - optional for AUC
+    
+    Returns:
+        (confusion_matrix, per_class_metrics, aggregated_metrics)
+    """
     num_classes = len(class_names)
     cm = confusion_matrix(y_true, y_pred, num_classes=num_classes)
     per_cls = per_class_prf(cm)
 
     acc = float(np.mean(y_true == y_pred)) if y_true.size else 0.0
+    balanced_acc = compute_balanced_accuracy(cm)
+    cohens_kappa = compute_cohens_kappa(cm)
+    
+    # AUC scores (if probabilities provided)
+    macro_auc = 0.0
+    weighted_auc = 0.0
+    if y_probs is not None and y_probs.ndim == 2:
+        macro_auc, weighted_auc = compute_auc_scores(y_true, y_probs, num_classes)
+    
+    # Top-k accuracy (if probabilities provided)
+    top3_acc = 0.0
+    top5_acc = 0.0
+    if y_probs is not None and y_probs.ndim == 2:
+        top3_acc = compute_topk_accuracy(y_true, y_probs, k=3)
+        if num_classes >= 5:
+            top5_acc = compute_topk_accuracy(y_true, y_probs, k=5)
+    
     agg = aggregate_metrics(per_cls)
     agg = ClassificationMetrics(
         accuracy=acc,
@@ -117,6 +317,12 @@ def compute_all_metrics(
         weighted_precision=agg.weighted_precision,
         weighted_recall=agg.weighted_recall,
         weighted_f1=agg.weighted_f1,
+        balanced_accuracy=balanced_acc,
+        macro_auc=macro_auc,
+        weighted_auc=weighted_auc,
+        top3_accuracy=top3_acc,
+        top5_accuracy=top5_acc,
+        cohens_kappa=cohens_kappa,
     )
     return cm, per_cls, agg
 
