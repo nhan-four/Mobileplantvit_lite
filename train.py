@@ -77,8 +77,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--initial_lr", type=float, default=1e-3)
     parser.add_argument("--min_lr", type=float, default=1e-6)
     parser.add_argument("--weight_decay", type=float, default=1e-4)
-    parser.add_argument("--lr_patience", type=int, default=3)
-    parser.add_argument("--early_stopping_patience", type=int, default=8)
+    parser.add_argument("--lr_patience", type=int, default=5)
+    parser.add_argument("--early_stopping_patience", type=int, default=10)
     parser.add_argument("--label_smoothing", type=float, default=0.0)
 
     # augmentation
@@ -305,6 +305,6 @@ if __name__ == "__main__":
 
 """
 
-python train.py --main_data_root /home/nhannv02/Hello/plantvit_lite/dataset/PlantVillage_origin_nonDelete --augment_level none
+python train.py --main_data_root /home/nhannv02/Hello/plantvit_lite/dataset/Dataset_for_Crop_Pest_and_Disease_Detection/Data_split/Tomato/seed_42
 
 """

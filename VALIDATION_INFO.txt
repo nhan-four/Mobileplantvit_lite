@@ -1,0 +1,34 @@
+===========================================
+VALIDATION OPTIMIZATION - THÔNG TIN
+===========================================
+
+ĐÃ CẬP NHẬT:
+1. Validation song song (ThreadPoolExecutor)
+2. Cache validation results
+3. Progress indicator
+4. Kiểm tra toàn diện hơn
+
+KẾT QUẢ TEST:
+- Lần 1 (không cache): 20.57s
+- Lần 2 (có cache):     0.01s
+- Nhanh hơn ~2057x
+
+CÁCH SỬ DỤNG:
+
+1. Training (tự động):
+   python train.py --config configs/baseline.yaml
+
+2. Xóa cache:
+   python clear_validation_cache.py --all-ccmt
+
+3. Test:
+   python test_validation_optimized.py
+
+DATASET CCMT STATS:
+- Tổng: 25,220 ảnh
+- Hợp lệ: 25,126 (99.63%)
+- Lỗi: 94 (0.37%)
+  + Cashew: 0 lỗi
+  + Cassava: 0 lỗi
+  + Maize: 69 lỗi
+  + Tomato: 25 lỗi

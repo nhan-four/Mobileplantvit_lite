@@ -8,7 +8,8 @@ cd "$PROJ_ROOT"
 
 DATA_ROOT_BASE="/home/nhannv02/Hello/plantvit_lite/dataset/Dataset_for_Crop_Pest_and_Disease_Detection/Data_split"
 
-CROPS=(Cashew Tomato Maize Cassava)
+# Cashew đã chạy xong với 3 seed (42, 123, 999)
+CROPS=(Tomato Maize Cassava)
 SEEDS=(42 123 999)
 
 for CROP in "${CROPS[@]}"; do
@@ -27,8 +28,10 @@ for CROP in "${CROPS[@]}"; do
       --attn_rank 96 \
       --ffn_expand 2.0 \
       --head_type gap \
-      --num_epochs_main 65 \
+      --num_epochs_main 80 \
       --batch_size 64 \
+      --augment_level paper
+
     echo "Finished v2.1: CROP=${CROP}, SEED=${SEED} at $(date)"
     echo
   done
