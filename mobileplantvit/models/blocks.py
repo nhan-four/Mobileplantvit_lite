@@ -126,7 +126,9 @@ class CBAM(nn.Module):
 
 
 class PatchEmbedding(nn.Module):
-    """Patchify a feature map with DepthConv(stride=patch_size) and add learnable positional embedding."""
+    """Patchify a feature map with DepthConv(stride=patch_size) and add learnable positional embedding.
+    Handles patch_size=0 or 1 as pointwise projection (no downsampling).
+    """
 
     def __init__(
         self,
@@ -138,6 +140,14 @@ class PatchEmbedding(nn.Module):
     ) -> None:
         super().__init__()
         fh, fw = feature_map_size
+        
+        # --- LOGIC MỚI: Xử lý Patch Size = 0 ---
+        # Theo paper, Patch=0 (hoặc 00) tương đương với việc chiếu trực tiếp (Pointwise)
+        # mà không giảm kích thước không gian. Ta gán về 1 để kernel_size=1, stride=1.
+        if patch_size == 0:
+            patch_size = 1
+        # ---------------------------------------
+
         if fh % patch_size != 0 or fw % patch_size != 0:
             raise ValueError(f"feature_map_size={feature_map_size} must be divisible by patch_size={patch_size}")
 

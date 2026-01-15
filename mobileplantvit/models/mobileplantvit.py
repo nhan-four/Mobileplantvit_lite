@@ -31,6 +31,13 @@ class MobilePlantViT(nn.Module):
         head_type: str = "attn",
     ) -> None:
         super().__init__()
+        
+        # --- SỬA LỖI: Xử lý patch_size=0 ---
+        if patch_size == 0:
+            print(f"[MobilePlantViT] Lưu ý: Patch Size = 0 được chuyển thành 1 (Pointwise) theo logic của paper.")
+            patch_size = 1
+        # ------------------------------------
+        
         self.image_size = image_size
 
         c0 = make_divisible(int(32 * width_mult))
@@ -122,6 +129,13 @@ class MobilePlantViT_LitePP(nn.Module):
         ffn_type: str = "tokenconv",
     ) -> None:
         super().__init__()
+        
+        # --- SỬA LỖI: Xử lý patch_size=0 ---
+        if patch_size == 0:
+            print(f"[MobilePlantViT_LitePP] Lưu ý: Patch Size = 0 được chuyển thành 1 (Pointwise) theo logic của paper.")
+            patch_size = 1
+        # ------------------------------------
+        
         self.image_size = image_size
 
         c0 = make_divisible(int(32 * width_mult))

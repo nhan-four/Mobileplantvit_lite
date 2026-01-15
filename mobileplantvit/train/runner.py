@@ -54,7 +54,8 @@ def run_phase(
     os.makedirs(ckpt_dir, exist_ok=True)
 
     criterion = nn.CrossEntropyLoss(label_smoothing=float(label_smoothing))
-    optimizer = torch.optim.AdamW(model.parameters(), lr=float(initial_lr), weight_decay=float(weight_decay))
+    # Theo cấu hình yêu cầu: Optimizer = Adam (không phải AdamW)
+    optimizer = torch.optim.Adam(model.parameters(), lr=float(initial_lr), weight_decay=float(weight_decay))
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer,
         mode="max",
@@ -159,7 +160,8 @@ def run_phase(
         save_checkpoint(last_path, model, optimizer, scheduler, scaler, epoch, best_val_acc, best_epoch)
 
         # Save "best" checkpoint on improvement
-        if val_acc > best_val_acc + 1e-6:
+        # Ngưỡng cải thiện validation accuracy theo yêu cầu: 1e-5
+        if val_acc > best_val_acc + 1e-5:
             best_val_acc = float(val_acc)
             best_epoch = int(epoch)
             best_state = copy.deepcopy(raw_model(model).state_dict())

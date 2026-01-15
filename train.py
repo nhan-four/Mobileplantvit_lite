@@ -46,7 +46,7 @@ def parse_args() -> argparse.Namespace:
     # model (shared)
     parser.add_argument("--img_size", type=int, default=224)
     parser.add_argument("--embed_dim", type=int, default=256)
-    parser.add_argument("--patch_size", type=int, default=4)
+    parser.add_argument("--patch_size", type=int, default=0)  # giữ nguyên patch_size=4 (giá trị trong paper bị ghi "00" không rõ nghĩa)
     parser.add_argument("--encoder_depth", type=int, default=1)
     parser.add_argument("--encoder_dropout", type=float, default=0.2)
     parser.add_argument("--classifier_dropout", type=float, default=0.2)
@@ -72,13 +72,13 @@ def parse_args() -> argparse.Namespace:
                         help="FFN type: 'tokenconv' (Lite++ default) or 'mlp' (baseline-style)")
 
     # training
-    parser.add_argument("--batch_size", type=int, default=32)
+    parser.add_argument("--batch_size", type=int, default=64)
     parser.add_argument("--num_workers", type=int, default=10)
     parser.add_argument("--initial_lr", type=float, default=1e-3)
-    parser.add_argument("--min_lr", type=float, default=1e-6)
-    parser.add_argument("--weight_decay", type=float, default=1e-4)
-    parser.add_argument("--lr_patience", type=int, default=5)
-    parser.add_argument("--early_stopping_patience", type=int, default=10)
+    parser.add_argument("--min_lr", type=float, default=1e-7)
+    parser.add_argument("--weight_decay", type=float, default=1e-3)
+    parser.add_argument("--lr_patience", type=int, default=10)
+    parser.add_argument("--early_stopping_patience", type=int, default=50)
     parser.add_argument("--label_smoothing", type=float, default=0.0)
 
     # augmentation
