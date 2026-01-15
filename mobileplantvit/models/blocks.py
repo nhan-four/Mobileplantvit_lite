@@ -126,10 +126,6 @@ class CBAM(nn.Module):
 
 
 class PatchEmbedding(nn.Module):
-    """Patchify a feature map with DepthConv(stride=patch_size) and add learnable positional embedding.
-    Handles patch_size=0 or 1 as pointwise projection (no downsampling).
-    """
-
     def __init__(
         self,
         in_channels: int,
@@ -141,13 +137,10 @@ class PatchEmbedding(nn.Module):
         super().__init__()
         fh, fw = feature_map_size
         
-        # --- LOGIC MỚI: Xử lý Patch Size = 0 ---
-        # Theo paper, Patch=0 (hoặc 00) tương đương với việc chiếu trực tiếp (Pointwise)
-        # mà không giảm kích thước không gian. Ta gán về 1 để kernel_size=1, stride=1.
+        # Xử lý patch_size=0 -> 1
         if patch_size == 0:
             patch_size = 1
-        # ---------------------------------------
-
+            
         if fh % patch_size != 0 or fw % patch_size != 0:
             raise ValueError(f"feature_map_size={feature_map_size} must be divisible by patch_size={patch_size}")
 
@@ -161,24 +154,33 @@ class PatchEmbedding(nn.Module):
         )
         self.cbam = CBAM(embed_dim) if use_cbam else nn.Identity()
 
-        tokens_h = fh // patch_size
-        tokens_w = fw // patch_size
-        num_tokens = tokens_h * tokens_w
-
-        pos = torch.zeros(1, num_tokens, embed_dim)
-        trunc_normal_(pos, std=0.02)
-        self.pos = nn.Parameter(pos)
+        # --- THAY ĐỔI Ở ĐÂY: DÙNG CPE ---
+        # Thay vì dùng self.pos = nn.Parameter(...) khổng lồ
+        # Ta dùng 1 lớp Conv 3x3 Depthwise (PEG) siêu nhẹ (~2.5K tham số)
+        self.peg = nn.Conv2d(
+            embed_dim, 
+            embed_dim, 
+            kernel_size=3, 
+            padding=1, 
+            groups=embed_dim, 
+            bias=True
+        )
+        # Khởi tạo weights cho PEG
+        nn.init.normal_(self.peg.weight, std=0.02)
+        nn.init.constant_(self.peg.bias, 0)
+        # --------------------------------
 
     def forward(self, x: Tensor) -> Tensor:
         x = self.proj(x)
-        x = self.cbam(x)
+        x = self.cbam(x) # Output shape: [B, Embed_Dim, H, W]
+
+        # --- ÁP DỤNG CPE (PEG) ---
+        # Cộng thông tin vị trí ngay trên không gian 2D trước khi flatten
+        x = x + self.peg(x) 
+        # -------------------------
 
         b, d, h, w = x.shape
         tokens = x.view(b, d, h * w).transpose(1, 2)  # [B, L, D]
 
-        if tokens.size(1) != self.pos.size(1):
-            raise RuntimeError(
-                f"Token length mismatch: got L={tokens.size(1)} but pos has L={self.pos.size(1)}. "
-                "Check img_size/downsample/patch_size."
-            )
-        return tokens + self.pos
+        # Không cần cộng self.pos ở đây nữa vì đã cộng self.peg(x) ở trên rồi
+        return tokens
